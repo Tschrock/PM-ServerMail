@@ -1,0 +1,16 @@
+# Default config for ServerMail plugin
+
+# This message will show up a a message to new players
+newPlayerMessage: Welcome to the Server!
+
+# This is the maximum number of messages that can be sent
+# to a player (resets when that player clears their mailbox).
+maxMessagesToPlayer: 10
+
+# The limit for similar messages. This is to prevent spam and will
+# prevent players from sending messages that are close to the same.
+
+# This is a percent (as a decimal) over which two messages will be considered "similar"
+# 0 will disable checking messages.
+# 1 will only block exact duplicates.
+similarLimit: 0.90
