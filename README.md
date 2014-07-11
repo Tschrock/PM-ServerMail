@@ -4,6 +4,8 @@ A PocketMine plugin that lets you send each other messages, even when the other 
 
 Commands:
 ---------
-/mail read - Show the messages you got.
-/mail clear - Clear your list of messages
+```
+/mail read - Show the messages you got.  
+/mail clear - Clear your list of messages  
 /mail send <player> <message> - Send someone a message
+```
