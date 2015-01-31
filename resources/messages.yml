@@ -10,6 +10,8 @@ messages:
     too_many: "You have reached your message limit to %1$s!"
     
     new_message: "%1$s just sent you a new message!"
+    
+    not_allowed: "You are not allowed to broadcast mail."
  
 commands:
     description: "Sends mail to other players."
