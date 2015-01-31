@@ -1,0 +1,25 @@
+## English strings
+messages:
+    count: "You have %1$d messages"
+    
+    cleared: "All messages cleared"
+    
+    sent: "Message sent!"
+    similar: "You already sent a message like that!"
+    no_player: "%1$s has no mailbox!"
+    too_many: "You have reached your message limit to %1$s!"
+    
+    new_message: "%1$s just sent you a new message!"
+ 
+commands:
+    description: "Sends mail to other players."
+    names:
+        mail: "mail"
+        read: "read"
+        clear: "clear"
+        send: "send"
+        sendall: "sendall"
+    usage:
+        usage: "Usage"
+        player: "player"
+        message: "message"

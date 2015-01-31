@@ -15,14 +15,19 @@ use pocketmine\plugin\PluginBase;
 use tschrock\ServerMailAPI;
 use pocketmine\event\Listener;
 use pocketmine\event\player\PlayerRespawnEvent;
+use pocketmine\utils\Config;
 
 /**
  * The main plugin class.
  */
 class ServerMail extends PluginBase implements Listener {
-    
+
     const CONFIG_MAXMESSAGE = "maxMessagesToPlayer";
     const CONFIG_SIMILARLIM = "similarLimit";
+    const CONFIG_NOTIFY = "notifyOnNew";
+
+    /** @var string[] */
+    protected $messages = [];
 
     /**
      * The onLoad function - empty.
@@ -36,8 +41,19 @@ class ServerMail extends PluginBase implements Listener {
      */
     public function onEnable() {
         $this->getServer()->getPluginManager()->registerEvents($this, $this);
-        #$this->saveDefaultConfig();
-        #$this->reloadConfig();
+        $this->saveDefaultConfig();
+        $this->reloadConfig();
+
+
+        $this->saveResource("messages.yml", false);
+        $messages = (new Config($this->getDataFolder() . "messages.yml"))->getAll();
+        $this->messages = $this->parseMessages($messages);
+
+        $mailCommand = $this->getCommand("mail");
+        $mailCommand->setAliases(array($this->getMessage("commands.names.mail")));
+        $mailCommand->setDescription($this->getMessage("commands.description"));
+        $mailCommand->setUsage($this->getMainCommandUsage());
+
 
         ServerMailAPI::setupDataFiles($this);
 
@@ -64,20 +80,23 @@ class ServerMail extends PluginBase implements Listener {
     public function onCommand(CommandSender $sender, Command $command, $label, array $args) {
         switch ($command->getName()) {
             case "mail":
+            case $this->getMessage("commands.names.mail"):
                 switch (strtolower(array_shift($args))) {
-                    case "read":  // fallthrough
-                    case "view":
+                    case "read":
+                    case $this->getMessage("commands.names.read"):
                         $messages = ServerMailAPI::getMessages($this->getUserName($sender));
-                        $this->sendChat($sender, "[ServerMail] You have " . count($messages) . " messages:");
+                        $this->sendChat($sender, "[ServerMail] " . sprintf($this->getMessage("messages.count"), count($messages)) . ".");
                         foreach ($messages as $message) {
                             $this->sendChat($sender, "    " . $message["sender"] . ": " . $message["message"]);
                         }
                         break;
                     case "clear":
+                    case $this->getMessage("commands.names.clear"):
                         ServerMailAPI::clearMessages($this->getUserName($sender));
-                        $this->sendChat($sender, "[ServerMail] All messages cleared");
+                        $this->sendChat($sender, "[ServerMail] " . $this->getMessage("messages.cleared"));
                         break;
                     case "send":
+                    case $this->getMessage("commands.names.send"):
                         $senderName = $this->getUserName($sender);
                         $recipiant = strtolower(array_shift($args));
                         $message = implode(" ", $args);
@@ -86,30 +105,40 @@ class ServerMail extends PluginBase implements Listener {
                             if ($this->checkUser($recipiant)) {
 
                                 if ($this->isMessageSimilar($senderName, $recipiant, $message)) {
-                                    $this->sendChat($sender, "[ServerMail] You already sent a message like that!");
+                                    $this->sendChat($sender, $this->getMessage("messages.similar"));
                                 } else {
                                     $msgCount = ServerMailAPI::countMessagesFromPlayer($senderName, $recipiant);
                                     $msgCountMax = $this->getConfig()->get(ServerMail::CONFIG_MAXMESSAGE);
                                     if ($msgCount > $msgCountMax) {
-                                        $this->sendChat($sender, "[ServerMail] You have reached your message limit to $recipiant! (" . ($msgCount - 1) . "/$msgCountMax)");
+                                        $this->sendChat($sender, "[ServerMail] " . sprintf($this->getMessage("messages.too_many"), $recipiant) . " (" . ($msgCount - 1) . "/$msgCountMax)");
                                     } else {
                                         ServerMailAPI::addMessage($recipiant, $senderName, $message);
-                                        $this->sendChat($sender, "[ServerMail] Message sent! ($msgCount/$msgCountMax)");
+                                        $this->sendChat($sender, "[ServerMail] " . $this->getMessage("messages.sent") . " ($msgCount/$msgCountMax)");
+                                        $this->sendNotification($recipiant, $senderName);
                                     }
                                 }
                             } else {
-                                $this->sendChat($sender, "[ServerMail] $recipiant has no mailbox!");
+                                $this->sendChat($sender, "[ServerMail] " . sprintf($this->getMessage("messages.no_player"), $recipiant));
+                                foreach ($this->getServer()->getOnlinePlayers() as $player) {
+                                    $this->sendNotification($player->getName(), $senderName);
+                                }
                             }
                         } else {
-                            $this->sendChat($sender, "Usage: /mail send <player> <message>");
+                            $this->sendChat($sender, $this->getSendCommandUsage());
                         }
 
                         break;
-                    case "broadcast":
-
-                    //break;
+                    case "sendall":
+                    case $this->getMessage("commands.names.sendall"):
+                        if ($sender->hasPermission("tschrock.servermail.command.mail.all")) {
+                            $senderName = $this->getUserName($sender);
+                            $message = implode(" ", $args);
+                            ServerMailAPI::sendall($senderName, $message);
+                            $this->sendChat($sender, "[ServerMail] " . $this->getMessage("messages.sent"));
+                        }
+                        break;
                     default:
-                        $this->sendChat($sender, "Usage: /mail <view|read|clear|send>");
+                        $this->sendChat($sender, $this->getMessage("commands.usage.usage") . ": " . $this->getMainCommandUsage());
                 }
                 return true;
             default:
@@ -120,6 +149,14 @@ class ServerMail extends PluginBase implements Listener {
     public function checkUser($name) {
         $name = strtolower($name);
         return file_exists($this->getServer()->getDataPath() . "players/$name.dat");
+    }
+
+    public function sendNotification($player, $sender) {
+        if ($this->getConfig()->get(ServerMail::CONFIG_NOTIFY) &&
+                ($pPlayer = $this->getServer()->getPlayerExact($player)) !== null &&
+                $pPlayer->isOnline()) {
+            $pPlayer->sendMessage("[ServerMail] " . sprintf($this->getMessage("messages.new_message"), $sender));
+        }
     }
 
     public function isMessageSimilar($fromPlayer, $toPlayer, $newmessage) {
@@ -162,7 +199,7 @@ class ServerMail extends PluginBase implements Listener {
     }
 
     public function sendChat(CommandSender $to, $message) {
-            $to->sendMessage($message);
+        $to->sendMessage($message);
     }
 
     public function getUserName($issuer) {
@@ -172,8 +209,7 @@ class ServerMail extends PluginBase implements Listener {
             return "Server";
         }
     }
-    
-    
+
     /**
      * @param PlayerRespawnEvent $event
      *
@@ -182,18 +218,46 @@ class ServerMail extends PluginBase implements Listener {
      */
     public function onRespawn(PlayerRespawnEvent $event) {
         $player = $event->getPlayer();
-        
+
         $messagecount = ServerMailAPI::getMessageCount($player);
 
-                if ($messagecount == 0) {
-                    $player->sendMessage("[ServerMail] You have no messages.");
-                } else {
-                    $player->sendMessage("[ServerMail] You have " . $messagecount . " messages.");
-                    $player->sendMessage("Use '/mail read' to see them. ");
-                }
+        $player->sendMessage("[ServerMail] " . sprintf($this->getMessage("messages.count"), $messagecount) . ".  /"
+                . $this->getMessage("commands.names.mail") . " "
+                . $this->getMessage("commands.names.read"));
     }
-    
-    
-    
+
+    public function getMessage($key) {
+        return isset($this->messages[$key]) ? $this->messages[$key] : $key;
+    }
+
+    public function getMainCommandUsage() {
+        return "/" . $this->getMessage("commands.names.mail")
+                . " < " . $this->getMessage("commands.names.read") . " | "
+                . $this->getMessage("commands.names.clear") . " | "
+                . $this->getMessage("commands.names.send") . " | "
+                . $this->getMessage("commands.names.sendall") . " >";
+    }
+
+    public function getSendCommandUsage() {
+        return $this->getMessage("commands.usage.usage") . ": /"
+                . $this->getMessage("commands.names.mail") . " "
+                . $this->getMessage("commands.names.send") . " < "
+                . $this->getMessage("commands.usage.player") . " > < "
+                . $this->getMessage("commands.usage.message") . " >";
+    }
+
+    private function parseMessages(array $messages) {
+        $result = [];
+        foreach ($messages as $key => $value) {
+            if (is_array($value)) {
+                foreach ($this->parseMessages($value) as $k => $v) {
+                    $result[$key . "." . $k] = $v;
+                }
+            } else {
+                $result[$key] = $value;
+            }
+        }
+        return $result;
+    }
 
 }

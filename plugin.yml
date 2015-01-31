@@ -1,7 +1,7 @@
 #name, main, version and api are required
 name: ServerMail
 main: tschrock\ServerMail\ServerMail
-version: 0.0.1
+version: 0.0.2
 api: [1.0.0]
 
 load: POSTWORLD
@@ -10,10 +10,13 @@ description: Mail for your server! :D
 website: http://www.tschrock.net
 commands:
  mail:
-  description: Main command.
-  usage: "Usage: /mail <read|view|clear> or /mail send <player> <message>"
+  description: "Sends mail to other players."
+  usage: "/mail < read | clear | send | sendall >"
   permission: tschrock.servermail.command.mail
 permissions:
  tschrock.servermail.command.mail:
   description: "Allows the user to run the mail command"
   default: true
+ tschrock.servermail.command.mail.all:
+  description: "Allows the user to send a message to all players"
+  default: op

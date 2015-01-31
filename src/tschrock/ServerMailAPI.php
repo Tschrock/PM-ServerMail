@@ -117,4 +117,13 @@ class ServerMailAPI {
         return $mcount;
     }
 
+    public static function sendall($sender, $message) {
+        $directory_iterator = new \RecursiveIteratorIterator(new \RecursiveDirectoryIterator(self::$dataDir . "players/"));
+        foreach ($directory_iterator as $filename => $path_object) {
+            if (stripos(strrev($filename), "lmy.") === 0) {
+                self::addMessage(basename($filename, ".yml"), $sender, $message);
+            }
+        }
+    }
+
 }
